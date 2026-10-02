@@ -1,5 +1,5 @@
 import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
-import { config, seal, unseal, cookie, setCookie, headers, mutation, session, accessToken, verifyIdentity } from './_security';
+import { config, seal, unseal, cookie, setCookie, headers, mutation, session, accessToken, verifyIdentity } from './_security.js';
 export default async function handler(req: any, res: any) {
   headers(res);
   try {

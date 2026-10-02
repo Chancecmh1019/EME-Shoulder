@@ -1,4 +1,4 @@
-import { accessToken, headers, mutation, uploadUrl } from './_security';
+import { accessToken, headers, mutation, uploadUrl } from './_security.js';
 export default async function handler(req: any, res: any) {
   headers(res);
   try {

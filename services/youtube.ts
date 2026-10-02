@@ -4,7 +4,10 @@ import { checkAbort } from './cancellation';
 export async function api<T = any>(url: string, body?: unknown): Promise<T> {
   const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', headers: body === undefined ? {} : { 'Content-Type': 'application/json', 'X-EME-Request': '1' }, body: body === undefined ? undefined : JSON.stringify(body) });
   const text = await response.text(); let data: any;
-  try { data = JSON.parse(text); } catch { throw new Error('上傳 API 未正確啟動。請使用 npm run dev，或部署到已設定 Google OAuth 的 Vercel 網站。'); }
+  try { data = JSON.parse(text); } catch {
+    if (response.status >= 500) throw new Error(`上傳 API 伺服器啟動或執行失敗（HTTP ${response.status}）。請查看 Vercel 的 Runtime Logs，修正後重新部署。`);
+    throw new Error(`上傳 API 未回傳有效資料（HTTP ${response.status}）。請確認部署包含 /api 函式；本機請使用 npm run dev。`);
+  }
   if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`); return data;
 }
 export async function publishTrack(t: TrackProject, video: Blob, thumbnail: Blob | undefined, update: (patch: Partial<TrackProject>) => Promise<void>, signal: AbortSignal) {
