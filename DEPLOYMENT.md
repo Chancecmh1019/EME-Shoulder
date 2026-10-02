@@ -71,7 +71,7 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 
 ## 4. 連接頻道與確認產出
 
-開啟正式網站 → Settings → 連接 YouTube，使用 OWNER_EMAIL 對應的 Google 帳號登入，允許權限，確認顯示正確的頻道。
+開啟正式網站 → Settings → 登入 Google 並連接 YouTube，使用 OWNER_EMAIL 對應的 Google 帳號登入，允許權限，確認顯示正確的頻道。
 先匯入一首自己的音訊與 LRC，確認預覽，再以 Private 隱私執行 Approve, Render & Upload。
 完成後到 YouTube Studio 確認影片、聲音、歌詞、標題、說明與縮圖。自訂縮圖需要頻道具備對應資格。
 

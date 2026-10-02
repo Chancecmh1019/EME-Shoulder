@@ -1,4 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import { OAuth2Client } from 'google-auth-library';
+const identityVerifier = new OAuth2Client();
 export function config() {
   const { APP_ORIGIN, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET, OWNER_EMAIL } = process.env;
   if (!APP_ORIGIN || !GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !SESSION_SECRET || !OWNER_EMAIL) throw new Error('請先設定 Vercel OAuth 與單一擁有者環境變數。');
@@ -24,8 +26,12 @@ export async function accessToken(req: any, res: any) {
   s.accessToken = token.access_token; s.expiresAt = Date.now() + token.expires_in * 1000; setCookie(res, 'eme_session', seal(s), Math.floor((s.expires - Date.now()) / 1000)); return s.accessToken!;
 }
 export async function verifyIdentity(token: string, nonce?: string) {
-  const r = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(token)}`); const identity = await r.json(); const c = config();
-  if (!r.ok || identity.aud !== c.clientId || !['accounts.google.com', 'https://accounts.google.com'].includes(identity.iss) || !['true', true].includes(identity.email_verified) || identity.email?.toLowerCase() !== c.owner || Number(identity.exp) * 1000 <= Date.now() || (nonce && identity.nonce !== nonce)) throw new Error('僅允許設定的頻道擁有者登入。');
+  const c = config();
+  let ticket;
+  try { ticket = await identityVerifier.verifyIdToken({ idToken: token, audience: c.clientId }); }
+  catch { throw new Error('Google 登入憑證驗證失敗，請重新授權。'); }
+  const identity = ticket.getPayload();
+  if (!identity || !identity.email_verified || identity.email?.toLowerCase() !== c.owner || Number(identity.exp) * 1000 <= Date.now() || (nonce && identity.nonce !== nonce)) throw new Error('僅允許設定的頻道擁有者登入。');
   return identity.email.toLowerCase();
 }
 export function uploadUrl(raw: string): string { const u = new URL(raw); if (u.protocol !== 'https:' || u.hostname !== 'www.googleapis.com' || u.pathname !== '/upload/youtube/v3/videos' || !u.searchParams.get('upload_id')) throw new Error('Invalid upload session'); return u.href; }
