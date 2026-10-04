@@ -15,11 +15,14 @@ export const METADATA_STYLE = {
   artistLeading: 1.18, songTitleLeading: 1.12, albumLeading: 1.20,
   artworkGap: 25.5, artistTitleGap: 15, titleAlbumGap: 21,
 } as const;
+// Lyric tokens are authored at 720p, then converted to the shared scene space.
+const LYRIC_REFERENCE_HEIGHT = 720;
+const lyricPixels = (referencePixels: number) => referencePixels * 1080 / LYRIC_REFERENCE_HEIGHT;
 export const LYRIC_STYLE = {
-  activeOriginalFontSize: 57, activeTranslationFontSize: 46.5,
-  contextOriginalFontSize: 48, contextTranslationFontSize: 39,
-  translationOpacity: .87, internalGap: 22.5,
-  nearGap: 63, farGap: 54, anchorRatio: .435,
+  activeOriginalFontSize: lyricPixels(40), activeTranslationFontSize: lyricPixels(31),
+  contextOriginalFontSize: lyricPixels(32), contextTranslationFontSize: lyricPixels(25),
+  translationOpacity: .87, internalGap: lyricPixels(20),
+  nearGap: lyricPixels(50), farGap: lyricPixels(46), anchorRatio: .435,
 } as const;
 export const LYRIC_DEPTH = {
   activeBlur: 0, nearBlur: 5.25, middleBlur: 10.5,
