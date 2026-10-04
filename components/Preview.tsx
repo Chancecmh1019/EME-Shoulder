@@ -2,11 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import { BookletScene, drawSubtitles, loadSceneFonts } from '../services/scene';
 import { getMedia } from '../services/storage';
 import { makeThumbnail } from '../services/renderEngine';
-import type { AlbumProject, TrackProject, VisualConfig } from '../types';
+import type { AlbumProject, ClipRange, TrackProject, VisualConfig } from '../types';
 import { useMediaUrl } from './hooks';
 type AlbumView = Pick<AlbumProject, 'id' | 'artworkKey' | 'visual'>;
-export function Preview({ track, album, onTime, mediaRef }: { track: TrackProject; album: AlbumView; onTime: (time: number) => void; mediaRef: React.RefObject<HTMLMediaElement | null> }) {
+export function Preview({ track, album, onTime, mediaRef, range }: { track: TrackProject; album: AlbumView; onTime: (time: number) => void; mediaRef: React.RefObject<HTMLMediaElement | null>; range?: ClipRange }) {
   const canvas = useRef<HTMLCanvasElement>(null); const video = useRef<HTMLVideoElement>(null);
+  const selectedRange = useRef(range); selectedRange.current = range;
   const url = useMediaUrl(track.kind === 'mv' ? track.sourceKey : track.audioKey); const [error, setError] = useState(''); const [loading, setLoading] = useState(true);
   useEffect(() => {
     let alive = true, frame = 0, scene: BookletScene | undefined; setError(''); setLoading(true);
@@ -19,7 +20,9 @@ export function Preview({ track, album, onTime, mediaRef }: { track: TrackProjec
         const draw = () => {
           if (!alive) return;
           try {
-            const time = mediaRef.current?.currentTime || 0;
+            const media = mediaRef.current, selected = selectedRange.current;
+            if (media && selected && !media.paused && media.currentTime >= selected.end) { media.pause(); media.currentTime = selected.end; onTime(selected.end); }
+            const time = media?.currentTime || 0;
             if (Math.abs(time - lastTime) >= 1 / album.visual.fps || lastTime < 0 || mediaRef.current?.paused && time !== lastTime) {
               if (scene) scene.draw(context, { currentTimeSeconds: time });
               else { context.clearRect(0, 0, 1920, 1080); drawSubtitles(context, track, { currentTimeSeconds: time }); }
@@ -32,11 +35,13 @@ export function Preview({ track, album, onTime, mediaRef }: { track: TrackProjec
     }; void run();
     return () => { alive = false; cancelAnimationFrame(frame); scene?.dispose(); };
   }, [track.id, track.title, track.artist, track.album, track.lyrics, track.lyricOffset, track.artworkKey, album.artworkKey, album.visual.fps, album.visual.flowSpeed, album.visual.fontScale, album.visual.vignette]);
+  useEffect(() => { const element = mediaRef.current; if (element && range) { element.currentTime = range.start; onTime(range.start); } }, [range?.start, range?.end, url]);
+  const rangePlay = (element: HTMLMediaElement) => { const selected = selectedRange.current; if (selected && (element.currentTime < selected.start || element.currentTime >= selected.end)) element.currentTime = selected.start; };
   return <section className="preview-panel" aria-label="影片預覽"><div className="preview-label"><span>{track.kind === 'mv' ? 'MV SUBTITLE' : 'CD—BOOKLET / 02'}</span><span>1920 × 1080 · {album.visual.fps} FPS</span></div><div className="stage">
     {track.kind === 'mv' && <video ref={el => { video.current = el; mediaRef.current = el; }} src={url} onTimeUpdate={e => onTime(e.currentTarget.currentTime)} playsInline />}
     <canvas ref={canvas} width={1920} height={1080} aria-label={`${track.title} 同步歌詞預覽`} />
     {loading && <div className="stage-message">準備專輯背景…</div>}{error && <div className="stage-message error" role="alert">{error}</div>}
-  </div>{track.kind === 'lyric' ? <audio ref={el => { mediaRef.current = el; }} src={url} controls onTimeUpdate={e => onTime(e.currentTarget.currentTime)} /> : <div className="mv-controls"><button onClick={() => { if (video.current?.paused) void video.current.play(); else video.current?.pause(); }}>播放 / 暫停</button><input aria-label="影片播放位置" type="range" min="0" max={track.duration || 1} step="0.05" onChange={e => { if (video.current) { video.current.currentTime = Number(e.target.value); onTime(Number(e.target.value)); } }} /></div>}
+  </div>{track.kind === 'lyric' ? <audio ref={el => { mediaRef.current = el; }} src={url} controls onPlay={e => rangePlay(e.currentTarget)} onLoadedMetadata={e => { if (range) e.currentTarget.currentTime = range.start; }} onTimeUpdate={e => onTime(e.currentTarget.currentTime)} /> : <div className="mv-controls"><button onClick={() => { if (video.current?.paused) void video.current.play(); else video.current?.pause(); }}>播放 / 暫停</button><input aria-label="影片播放位置" type="range" min="0" max={track.duration || 1} step="0.05" onChange={e => { if (video.current) { video.current.currentTime = Number(e.target.value); onTime(Number(e.target.value)); } }} /></div>}
     <p className="caption">以播放時間計算完整畫面。點選歌詞時間即可定位。</p>
   </section>;
 }

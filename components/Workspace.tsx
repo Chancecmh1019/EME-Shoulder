@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { defaultVisual, trackStatus, type AlbumProject, type TrackProject } from '../types';
+import { defaultVisual, trackStatus, type AlbumProject, type TrackProject, type ClipRange } from '../types';
 import { LibraryStore } from '../services/library';
 import { ProductionQueue } from '../services/queue';
 import { Preview, ThumbnailPreview } from './Preview';
@@ -9,9 +9,11 @@ import { normalizeLines, parseLRC, parseSRT, validateLyrics } from '../utils/par
 import { validatePublishing, videoTitle, videoDescription } from '../utils/publishing';
 import { api } from '../services/youtube';
 import { LyricsWorkbench } from './LyricsWorkbench';
+import { LyricOffset } from './LyricOffset';
+import { ThreadsClip } from './ThreadsClip';
 import { serializeLRC, serializeSRT } from '../utils/parsers';
 export function Workspace({ album, track, store, queue, onSelect, onApproved, report }: { album?: AlbumProject; track: TrackProject; store: LibraryStore; queue: ProductionQueue; onSelect: (id: string) => void; onApproved: () => void; report: (message: string) => void }) {
-  const media = useRef<HTMLMediaElement>(null), [time, setTime] = useState(0), [tab, setTab] = useState<'lyrics' | 'publish' | 'visual'>('lyrics'), [busy, setBusy] = useState(false), [correction, setCorrection] = useState(false), [reviewMode, setReviewMode] = useState<'bulk' | 'lines'>('bulk');
+  const media = useRef<HTMLMediaElement>(null), [time, setTime] = useState(0), [tab, setTab] = useState<'lyrics' | 'publish' | 'visual'>('lyrics'), [busy, setBusy] = useState(false), [correction, setCorrection] = useState(false), [reviewMode, setReviewMode] = useState<'bulk' | 'lines'>('bulk'), [clipRange, setClipRange] = useState<ClipRange>();
   const locked = ['pending', 'running'].includes(track.render) || ['pending', 'running'].includes(track.publish);
   const view = album ?? { id: track.id, artworkKey: track.artworkKey, visual: defaultVisual };
   const patch = (data: Partial<TrackProject>) => { void store.patchTrack(track.id, { ...data, review: data.lyrics ? data.lyrics.length ? 'needs-review' : 'needs-lyrics' : 'needs-review' }).catch(e => report(e.message)); };
@@ -39,17 +41,18 @@ export function Workspace({ album, track, store, queue, onSelect, onApproved, re
       <div className="track-list">{(album?.tracks ?? store.data.mv).map(t => <button key={t.id} className={t.id === track.id ? 'selected' : ''} onClick={() => { setTime(0); onSelect(t.id); }}><span className="track-number">{t.kind === 'mv' ? 'MV' : `${t.discNumber || 1}.${String(t.trackNumber ?? t.importOrder + 1).padStart(2, '0')}`}</span><span><strong>{t.title}</strong><small>{t.artist}</small><small className={`state ${t.error ? 'error' : ''}`}>{trackStatus(t)}</small></span></button>)}</div>
     </aside>
     <main className="work-center"><div className="track-heading"><div><small>{track.kind === 'mv' ? 'SUBTITLE REVIEW' : 'TRACK REVIEW'}</small><h1>{track.title}</h1><p>{track.artist} <span> / </span> {track.album}</p></div><span className="status-pill">{trackStatus(track)}</span></div>
-      <Preview key={track.id} track={track} album={view} onTime={setTime} mediaRef={media}/>
+      <Preview key={track.id} track={track} album={view} onTime={setTime} mediaRef={media} range={clipRange}/>
       <div className="production-bar"><div><strong>完成校稿，交給 Shoulder。</strong><small>{track.privacy === 'private' ? 'Private' : track.privacy} · YouTube · 依序渲染，上傳可同時進行</small></div><button className="primary" disabled={locked || busy} onClick={() => void approve()}>{busy ? '確認頻道…' : 'Approve, Render & Upload'} <span>↗</span></button></div>
       <div className="export-local"><button disabled={locked || busy} onClick={() => void exportOnly()}>僅匯出影片 · 60 FPS</button><small>完成後在 Queue 下載，或接續上傳 YouTube。</small></div>
       {track.error && <p className="error" role="alert">{track.error}</p>}
       {locked && <p className="caption">此版本已核准，產出期間暫停編輯。你可以繼續校稿其他曲目。</p>}
       <div className="review-tool-entry"><span>整份歌詞一起調整</span><button disabled={locked} onClick={() => setCorrection(true)}>整份 LRC／SRT 校正 ↗</button></div>
       <p className="caption">{track.lyrics.length} 行歌詞 · 在集中校稿視窗一起調整</p>
+      {track.kind === 'lyric' && <ThreadsClip track={track} album={view} store={store} queue={queue} report={report} onPreview={(range, play) => { setClipRange(range); const element = media.current; if (element) { element.pause(); if (range) { element.currentTime = range.start; setTime(range.start); if (play) void element.play().catch(e => report(e.message)); } } }}/>}
     </main>
     <aside className="inspector"><div className="inspector-tabs">{(['lyrics', 'publish', 'visual'] as const).filter(x => track.kind !== 'mv' || x !== 'visual').map(x => <button key={x} className={tab === x ? 'selected' : ''} onClick={() => setTab(x)}>{x === 'lyrics' ? '曲目' : x === 'publish' ? '發佈' : '畫面'}</button>)}</div>
       {tab === 'lyrics' && <><div className="section-label">SOURCE & TIMING</div><button disabled={locked} onClick={() => setCorrection(true)}>貼上／校正歌詞</button><label className="file-button">直接匯入 {track.kind === 'mv' ? 'SRT' : 'LRC'}<input disabled={locked} type="file" accept={track.kind === 'mv' ? '.srt' : '.lrc'} onChange={e => { void readLyrics(e.target.files?.[0]).catch(e => report(e.message)); e.target.value = ''; }}/></label>
-        <label>全域延遲（秒）<input disabled={locked} type="number" step="0.05" value={track.lyricOffset} onChange={e => patch({ lyricOffset: Number(e.target.value) })}/><small>正值延後顯示歌詞。</small></label>
+        <LyricOffset value={track.lyricOffset} disabled={locked} onChange={lyricOffset => patch({ lyricOffset })}/>
         {(['title', 'artist', 'album', 'albumArtist'] as const).map(key => <label key={key}>{({ title: '曲名', artist: '演出者', album: '專輯', albumArtist: '專輯演出者' })[key]}<input disabled={locked} value={track[key]} onChange={e => patch({ [key]: e.target.value })}/></label>)}
         {track.untimedLyrics && <details><summary>未同步的內嵌歌詞</summary><pre>{track.untimedLyrics}</pre><p className="caption">請在 LRC Lab 校正時間後匯入。</p></details>}
         {track.kind === 'mv' && <label>手動套用曲目發佈資訊<select disabled={locked} value="" onChange={e => { const t = store.track(e.target.value); if (t) patch({ title: t.title, artist: t.artist, album: t.album, titleOverride: videoTitle(t), descriptionOverride: videoDescription(t) }); }}><option value="">選擇對應曲目…</option>{store.data.albums.flatMap(a => a.tracks).map(t => <option key={t.id} value={t.id}>{t.artist} — {t.title}</option>)}</select></label>}

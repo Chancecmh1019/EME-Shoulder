@@ -48,10 +48,13 @@ export function serializeSRT(lines: LyricLine[], offset = 0): string {
 }
 export function validateLyrics(lines: LyricLine[], duration = 0, offset = 0): string[] {
   const errors: string[] = [];
+  if (!Number.isFinite(offset)) errors.push('歌詞位移無效');
   lines.forEach((l, i) => {
     if (!Number.isFinite(l.startTime) || !Number.isFinite(l.endTime) || l.startTime < 0 || l.endTime <= l.startTime) errors.push(`第 ${i + 1} 行時間無效`);
     if (i && l.startTime < lines[i - 1].endTime) errors.push(`第 ${i + 1} 行時間重疊`);
-    if (l.startTime + offset < 0 || (duration && l.startTime + offset >= duration)) errors.push(`第 ${i + 1} 行超出媒體時間`);
+    // A negative global offset may begin a line before media time zero;
+    // preview and export show its remaining interval without changing the LRC.
+    if (duration && l.startTime + offset >= duration) errors.push(`第 ${i + 1} 行超出媒體時間`);
   });
   return errors;
 }

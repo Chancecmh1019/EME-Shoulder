@@ -10,16 +10,30 @@ lerna-debug.log*
 node_modules
 public/ffmpeg
 .env*
+!.env.example
 .vercel
 dist
 dist-ssr
 *.local
+
+# Local caches, validation artifacts, and media exports
+.cache/
+.tmp/
+.temp/
+coverage/
+test-results/
+playwright-report/
+/exports/
+/renders/
+*.tsbuildinfo
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
+Desktop.ini
 *.suo
 *.ntvs*
 *.njsproj

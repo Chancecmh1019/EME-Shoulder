@@ -1,0 +1,11 @@
+import React, { useEffect, useRef, useState } from 'react';
+export function LyricOffset({ value, disabled, onChange }: { value: number; disabled: boolean; onChange: (seconds: number) => void }) {
+  const [step, setStep] = useState(10), current = useRef(value), timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined), repeat = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+  current.current = value;
+  const stop = () => { clearTimeout(timer.current); clearInterval(repeat.current); };
+  useEffect(() => stop, []);
+  useEffect(() => { if (disabled) stop(); }, [disabled]);
+  const adjust = (direction: number) => { if (disabled) return; current.current = (Math.round(current.current * 1000) + direction * step) / 1000; onChange(current.current); };
+  const hold = (e: React.PointerEvent<HTMLButtonElement>, direction: number) => { if (e.button !== 0) return; e.currentTarget.setPointerCapture(e.pointerId); stop(); adjust(direction); timer.current = setTimeout(() => { repeat.current = setInterval(() => adjust(direction), 100); }, 450); };
+  return <section className="offset-control" aria-label="全域歌詞位移"><div className="section-label">LYRIC OFFSET</div><label>調整幅度<select disabled={disabled} value={step} onChange={e => { stop(); setStep(Number(e.target.value)); }}>{[1, 10, 100, 1000].map(ms => <option key={ms} value={ms}>{ms} ms</option>)}</select></label><div className="offset-buttons">{([-1, 1] as const).map(direction => <React.Fragment key={direction}>{direction === 1 && <output aria-live="polite">{value >= 0 ? '+' : ''}{Math.round(value * 1000)} ms</output>}<button disabled={disabled} aria-label={direction < 0 ? '歌詞提前' : '歌詞延後'} onPointerDown={e => hold(e, direction)} onPointerUp={stop} onPointerCancel={stop} onLostPointerCapture={stop} onClick={e => { if (e.detail === 0) adjust(direction); }}>{direction < 0 ? '−' : '+'}</button></React.Fragment>)}</div><button disabled={disabled} onClick={() => { stop(); current.current = 0; onChange(0); }}>重設 0 ms</button><small>正值延後，負值提前。可按住連續調整。</small><details><summary>直接輸入</summary><label>位移（ms）<input disabled={disabled} type="number" step="1" value={Math.round(value * 1000)} onChange={e => { const ms = Number(e.target.value); if (Number.isFinite(ms)) { current.current = Math.round(ms) / 1000; onChange(current.current); } }}/></label></details></section>;
+}
