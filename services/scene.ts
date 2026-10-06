@@ -27,8 +27,10 @@ export const LYRIC_STYLE = {
   nearGap: lyricPixels(42), farGap: lyricPixels(38), anchorRatio: .435,
 } as const;
 export const LYRIC_DEPTH = {
-  activeBlur: 0, nearBlur: 5.25, middleBlur: 10.5,
-  farBlur: 15, maxBlur: 21,
+  activeBlur: 0, nearBlur: lyricPixels(1.8), middleBlur: lyricPixels(2.8),
+  farBlur: lyricPixels(3.8), fourthBlur: lyricPixels(4.6), maxBlur: lyricPixels(5.3),
+  nearOpacity: .54, middleOpacity: .36, farOpacity: .24,
+  fourthOpacity: .18, distantOpacity: .12, minimumFutureOpacity: .10,
 } as const;
 const LYRIC_EDGE_FEATHER = 32;
 export function displayAlbumTitle(album: string): string {
@@ -186,8 +188,10 @@ export function sceneState(track: TrackProject, clock: RenderClock, measured: Me
     const distance = Math.abs(i - focus);
     const upcoming = i >= focus;
     const y = activeAnchor + centers[i] - scrollAnchor;
-    let opacity = interpolateDepth(distance, upcoming ? [1, .48, .22, .12] : [1, .48, .22, 0]);
-    let blur = interpolateDepth(distance, [LYRIC_DEPTH.activeBlur, LYRIC_DEPTH.nearBlur, LYRIC_DEPTH.middleBlur, LYRIC_DEPTH.farBlur]);
+    let opacity = interpolateDepth(distance, upcoming
+      ? [1, LYRIC_DEPTH.nearOpacity, LYRIC_DEPTH.middleOpacity, LYRIC_DEPTH.farOpacity, LYRIC_DEPTH.fourthOpacity, LYRIC_DEPTH.distantOpacity, LYRIC_DEPTH.minimumFutureOpacity]
+      : [1, LYRIC_DEPTH.nearOpacity, LYRIC_DEPTH.middleOpacity, 0]);
+    let blur = interpolateDepth(distance, [LYRIC_DEPTH.activeBlur, LYRIC_DEPTH.nearBlur, LYRIC_DEPTH.middleBlur, LYRIC_DEPTH.farBlur, LYRIC_DEPTH.fourthBlur, LYRIC_DEPTH.maxBlur]);
     if (upcoming && distance > 3) {
       const top = y - heights[i] / 2;
       const room = clamp((lyricRegionBottom + LYRIC_EDGE_FEATHER - top) / LYRIC_EDGE_FEATHER);
@@ -196,8 +200,7 @@ export function sceneState(track: TrackProject, clock: RenderClock, measured: Me
       const blend = extra * extra * (3 - 2 * extra);
       // Let a partial final item reach the bottom mask. Requiring its entire
       // block to fit would hide the continuing stream above the footer boundary.
-      opacity = .12 * Math.pow(.72, distance - 3) * (1 - blend + blend * fit);
-      blur = Math.min(LYRIC_DEPTH.maxBlur, LYRIC_DEPTH.farBlur + (distance - 3) * 1.5);
+      opacity *= 1 - blend + blend * fit;
     }
     // The timed active item stays sharp even while its scroll focus is arriving.
     if (i === index) blur = LYRIC_DEPTH.activeBlur;

@@ -1,8 +1,8 @@
-# EME-Shoulder
+# EME Shoulder
 
 The browser-based production workspace behind EMBRASEA Music Entertainment's Traditional Chinese translated lyric-video workflow.
 
-EME-Shoulder brings translation preparation, album review, CD-Booklet lyric videos, MV subtitles, publishing assets, and YouTube delivery into one workspace. It also produces promotional excerpts for manual publication on Threads. Media processing takes place in the browser; a small server layer handles Google authorization and YouTube upload coordination.
+EME Shoulder brings translation preparation, album review, CD-Booklet lyric videos, MV subtitles, publishing assets, and YouTube delivery into one workspace. It also produces promotional excerpts for manual publication on Threads. Media processing takes place in the browser; a small server layer handles Google authorization and YouTube upload coordination.
 
 The production model centers on line-by-line timing, human-reviewed translations, album projects, deterministic visual state, and a consistent channel identity. It does not include a generative AI service, TTML, or word-by-word lyric timing.
 
@@ -20,14 +20,14 @@ An `AlbumProject` contains multiple `TrackProject` records, shared artwork and v
 
 LRC Lab has two stages inside the application's dialog workflow:
 
-- **Static Translation Prompt Library:** predefined LRC and SRT prompts can be copied for external use. EME-Shoulder does not call an AI service or bundle a generative AI API.
+- **Static Translation Prompt Library:** predefined LRC and SRT prompts can be copied for external use. EME Shoulder does not call an AI service or bundle a generative AI API.
 - **Correction and validation:** imported or pasted lyrics are parsed, corrected, reviewed, copied, and exported. The workbench supports Copy & Clear, Clear, Undo, and clearing the current correction session. Optional audio playback and line-level editing support proofreading and timing review.
 
 Correction addresses malformed or joined timestamps, ordering, whitespace, optional Traditional Chinese conversion, and pairing warnings. Corrected lyrics can be applied directly to album tracks or MV subtitle projects. Clearing a Lab session resets its lyric and audio review state; Undo restores the preceding session state while the dialog remains mounted.
 
 ### Lyric model
 
-EME-Shoulder intentionally uses **line-by-line LRC** for CD-Booklet videos. One timed item contains an original lyric and an optional Traditional Chinese translation. Matching original and translation lines form one bilingual visual unit and share timing and depth state.
+EME Shoulder intentionally uses **line-by-line LRC** for CD-Booklet videos. One timed item contains an original lyric and an optional Traditional Chinese translation. Matching original and translation lines form one bilingual visual unit and share timing and depth state.
 
 Multiline text is supported inside an item. It does not introduce word-level synchronization. TTML is not supported. SRT is used for the independent MV subtitle workflow.
 
@@ -43,11 +43,11 @@ Track review includes editable lyrics and timestamps, playback and seeking, and 
 
 CD-Booklet is the single album lyric-video composition. Artwork and centered artist, song, and album metadata occupy the left column. A continuous bilingual lyric stream occupies the right. An album-derived animated background, EMBRASEA branding, and disc/track information complete the frame.
 
-The composition draws from editorial CD booklets, full-screen music players, and Apple Music-like lyric depth and motion. EME-Shoulder is an independent application and is not affiliated with Apple.
+The composition draws from editorial CD booklets, full-screen music players, and Apple Music-like lyric depth and motion. EME Shoulder is an independent application and is not affiliated with Apple.
 
 ### Background environment
 
-The background integrates the pinned `@applemusic-like-lyrics/core` 0.6.0 package from [Apple Music-like Lyrics (AMLL)](https://github.com/amll-dev/applemusic-like-lyrics). `services/background.ts` adapts its mesh renderer to album artwork and an explicit source-time clock, with fixed mesh control and no accumulated playback history. AMLL supplies the background renderer; EME-Shoulder owns the composition, lyric layout, and production workflow.
+The background integrates the pinned `@applemusic-like-lyrics/core` 0.6.0 package from [Apple Music-like Lyrics (AMLL)](https://github.com/amll-dev/applemusic-like-lyrics). `services/background.ts` adapts its mesh renderer to album artwork and an explicit source-time clock, with fixed mesh control and no accumulated playback history. AMLL supplies the background renderer; EME Shoulder owns the composition, lyric layout, and production workflow.
 
 AMLL core is AGPL-3.0-only. This repository is distributed under AGPL-3.0-only and retains its source-availability and third-party notices.
 
@@ -136,7 +136,7 @@ Publication remains subject to owner authorization, API permissions and quotas, 
 
 ## Application and deployment architecture
 
-EME-Shoulder is designed for Vercel: Vite builds the browser application, and lightweight `api/` functions handle authorization, token refresh, upload-session creation, and status queries. Large video bodies go directly to Google rather than through serverless functions. Local Vite development exposes the same handlers; static preview alone does not provide the API layer.
+EME Shoulder is designed for Vercel: Vite builds the browser application, and lightweight `api/` functions handle authorization, token refresh, upload-session creation, and status queries. Large video bodies go directly to Google rather than through serverless functions. Local Vite development exposes the same handlers; static preview alone does not provide the API layer.
 
 Deployment configuration is documented separately in [DEPLOYMENT.md](DEPLOYMENT.md). The repository targets Node.js 22.x. Its build performs TypeScript checking before producing the bundle.
 
@@ -156,7 +156,7 @@ Noto Serif, Noto Serif TC, Noto Serif JP, and Noto Serif KR are locally hosted t
 
 ## License and third-party software
 
-EME-Shoulder is distributed under **AGPL-3.0-only**; see [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Corresponding source is published in [Chancecmh1019/EME-Shoulder](https://github.com/Chancecmh1019/EME-Shoulder). Hosted versions must make the corresponding source for their exact deployed build available, including modifications and build configuration.
+EME Shoulder is distributed under **AGPL-3.0-only**; see [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Corresponding source is published in [Chancecmh1019/EME Shoulder](https://github.com/Chancecmh1019/EME-Shoulder). Hosted versions must make the corresponding source for their exact deployed build available, including modifications and build configuration.
 
 AMLL core is AGPL-3.0-only, Mediabunny is MPL-2.0, FFmpeg WASM wrappers are MIT, and the distributed `@ffmpeg/core` package is GPL-2.0-or-later. FFmpeg binary distribution also requires applicable source and build information; the notices identify upstream sources. Noto Serif fonts use SIL Open Font License 1.1, with retained notices in `public/licenses/`.
 

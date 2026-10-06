@@ -1,4 +1,4 @@
-# EME-Shoulder：GitHub 與 Vercel 部署
+# EME Shoulder：GitHub 與 Vercel 部署
 
 原始碼：https://github.com/Chancecmh1019/EME-Shoulder
 
@@ -16,7 +16,7 @@ Git 提交姓名與 Email 只用於標示作者，不等於 GitHub 或 Google �
 ## 1. 匯入 GitHub 倉庫
 
 在 https://vercel.com/new 登入後，選擇 Import Git Repository → Chancecmh1019/EME-Shoulder。
-若看不到倉庫，調整 GitHub integration 的倉庫存取範圍，允許存取 EME-Shoulder。
+若看不到倉庫，調整 GitHub integration 的倉庫存取範圍，允許存取 EME Shoulder。
 
 建置設定：
 
