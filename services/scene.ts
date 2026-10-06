@@ -8,6 +8,8 @@ export async function loadSceneFonts(track: TrackProject) {
 }
 const clamp = (x: number) => Math.max(0, Math.min(1, x));
 export const BOOKLET_CONTENT = { top: 60, bottom: 940, left: 108, artworkSize: 590, lyricX: 824, lyricWidth: 960 } as const;
+const BOOKLET_FOOTER_TOP = 970;
+export const LYRIC_VIEWPORT = { top: BOOKLET_CONTENT.top, bottom: BOOKLET_FOOTER_TOP - 4 } as const;
 const contentHeight = BOOKLET_CONTENT.bottom - BOOKLET_CONTENT.top;
 // Canonical 1080p values; multiply by 2/3 for the 720p reference.
 export const METADATA_STYLE = {
@@ -22,11 +24,11 @@ export const LYRIC_STYLE = {
   activeOriginalFontSize: lyricPixels(40), activeTranslationFontSize: lyricPixels(31),
   contextOriginalFontSize: lyricPixels(32), contextTranslationFontSize: lyricPixels(25),
   translationOpacity: .87, internalGap: lyricPixels(20),
-  nearGap: lyricPixels(50), farGap: lyricPixels(46), anchorRatio: .435,
+  nearGap: lyricPixels(42), farGap: lyricPixels(38), anchorRatio: .435,
 } as const;
 export const LYRIC_DEPTH = {
   activeBlur: 0, nearBlur: 5.25, middleBlur: 10.5,
-  farBlur: 15, maxBlur: 16.5,
+  farBlur: 15, maxBlur: 21,
 } as const;
 const LYRIC_EDGE_FEATHER = 32;
 export function displayAlbumTitle(album: string): string {
@@ -175,8 +177,9 @@ export function sceneState(track: TrackProject, clock: RenderClock, measured: Me
     centers[i] = i ? centers[i - 1] + heights[i - 1] / 2 + gap + heights[i] / 2 : heights[i] / 2;
   }
   const scrollAnchor = mix(centers[previousIndex] ?? 0, centers[anchorIndex] ?? 0);
-  const lyricRegionTop = BOOKLET_CONTENT.top, lyricRegionBottom = BOOKLET_CONTENT.bottom;
-  const activeAnchor = lyricRegionTop + (lyricRegionBottom - lyricRegionTop) * LYRIC_STYLE.anchorRatio;
+  const lyricRegionTop = LYRIC_VIEWPORT.top, lyricRegionBottom = LYRIC_VIEWPORT.bottom;
+  // Extending visibility below the stream must not move its approved focus.
+  const activeAnchor = BOOKLET_CONTENT.top + contentHeight * LYRIC_STYLE.anchorRatio;
   const lyrics = measured.map((m, i) => {
     // Extra context occupies the same measured continuous stream, with no slots
     // or gap stretching. Only future items beyond +3 need available bottom space.
@@ -186,15 +189,15 @@ export function sceneState(track: TrackProject, clock: RenderClock, measured: Me
     let opacity = interpolateDepth(distance, upcoming ? [1, .48, .22, .12] : [1, .48, .22, 0]);
     let blur = interpolateDepth(distance, [LYRIC_DEPTH.activeBlur, LYRIC_DEPTH.nearBlur, LYRIC_DEPTH.middleBlur, LYRIC_DEPTH.farBlur]);
     if (upcoming && distance > 3) {
-      const bottom = y + heights[i] / 2;
-      const room = clamp((lyricRegionBottom + LYRIC_EDGE_FEATHER - bottom) / LYRIC_EDGE_FEATHER);
+      const top = y - heights[i] / 2;
+      const room = clamp((lyricRegionBottom + LYRIC_EDGE_FEATHER - top) / LYRIC_EDGE_FEATHER);
       const fit = room * room * (3 - 2 * room);
       const extra = clamp(distance - 3);
       const blend = extra * extra * (3 - 2 * extra);
-      // Geometry fades eligibility continuously during scrolling. An additional
-      // item's complete block must fit within the viewport + soft-edge allowance.
+      // Let a partial final item reach the bottom mask. Requiring its entire
+      // block to fit would hide the continuing stream above the footer boundary.
       opacity = .12 * Math.pow(.72, distance - 3) * (1 - blend + blend * fit);
-      blur = Math.min(LYRIC_DEPTH.maxBlur, LYRIC_DEPTH.farBlur + (distance - 3) * .5);
+      blur = Math.min(LYRIC_DEPTH.maxBlur, LYRIC_DEPTH.farBlur + (distance - 3) * 1.5);
     }
     // The timed active item stays sharp even while its scroll focus is arriving.
     if (i === index) blur = LYRIC_DEPTH.activeBlur;
@@ -209,8 +212,8 @@ export async function loadCover(blob?: Blob): Promise<HTMLImageElement> {
   try { const img = new Image(); img.src = url; await img.decode(); return img; } finally { if (blob) URL.revokeObjectURL(url); }
 }
 export class BookletScene {
-  private readonly lyricTop = BOOKLET_CONTENT.top;
-  private readonly lyricHeight = contentHeight;
+  private readonly lyricTop = LYRIC_VIEWPORT.top;
+  private readonly lyricHeight = LYRIC_VIEWPORT.bottom - LYRIC_VIEWPORT.top;
   private background: AlbumBackground;
   private measured: MeasuredLine[];
   private artworkColumn: ReturnType<typeof measureArtworkColumn>;
@@ -265,7 +268,7 @@ export class BookletScene {
     if (!thumbnail) {
       const layer = this.lyricCanvas.getContext('2d')!; layer.clearRect(0, 0, 1060, this.lyricHeight); layer.textBaseline = 'top';
       for (const pose of state.lyrics) {
-        const m = this.measured[pose.index]; if (pose.opacity <= 0 || pose.y + pose.height * pose.scale / 2 < this.lyricTop - 24 || pose.y - pose.height * pose.scale / 2 > BOOKLET_CONTENT.bottom + 24) continue;
+        const m = this.measured[pose.index]; if (pose.opacity <= 0 || pose.y + pose.height * pose.scale / 2 < this.lyricTop - 24 || pose.y - pose.height * pose.scale / 2 > state.lyricRegionBottom + 24) continue;
         layer.save(); layer.translate(39, pose.y - this.lyricTop); layer.scale(pose.scale, pose.scale); layer.globalAlpha = pose.opacity; layer.filter = `blur(${pose.blur}px)`;
         let y = -pose.height / 2; layer.font = `400 ${pose.originalBlock.size}px ${FONT}`; layer.fillStyle = '#fffaf1';
         m.original.forEach((l, i) => layer.fillText(l, 0, y - pose.originalBlock.inkTop + i * pose.originalBlock.lineHeight));
@@ -283,8 +286,8 @@ export class BookletScene {
       fade.addColorStop(maskBottom - LYRIC_EDGE_FEATHER / this.lyricHeight, '#fff'); fade.addColorStop(maskBottom, 'transparent'); fade.addColorStop(1, 'transparent');
       layer.fillStyle = fade; layer.fillRect(0, 0, 1060, this.lyricHeight); layer.restore(); ctx.drawImage(this.lyricCanvas, BOOKLET_CONTENT.lyricX - 39, this.lyricTop);
     } else { ctx.font = `400 40px ${FONT}`; ctx.fillText('繁體中文歌詞', 820, 875); }
-    ctx.globalAlpha = .82; ctx.fillStyle = '#f6f0e5'; ctx.font = `400 ${thumbnail ? 28 : 19}px ${FONT}`; ctx.fillText('EMBRASEA  /  MUSIC ENTERTAINMENT', 108, 970);
-    ctx.textAlign = 'right'; ctx.fillText(`DISC ${track.discNumber || 1}  ·  ${String(track.trackNumber ?? track.importOrder + 1).padStart(2, '0')}`, 1812, 970); ctx.restore();
+    ctx.globalAlpha = .82; ctx.fillStyle = '#f6f0e5'; ctx.font = `400 ${thumbnail ? 28 : 19}px ${FONT}`; ctx.fillText('EMBRASEA  /  MUSIC ENTERTAINMENT', 108, BOOKLET_FOOTER_TOP);
+    ctx.textAlign = 'right'; ctx.fillText(`DISC ${track.discNumber || 1}  ·  ${String(track.trackNumber ?? track.importOrder + 1).padStart(2, '0')}`, 1812, BOOKLET_FOOTER_TOP); ctx.restore();
   }
   dispose() { this.background.dispose(); this.cover.src = ''; this.lyricCanvas.width = this.lyricCanvas.height = 1; }
 }
