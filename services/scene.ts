@@ -9,7 +9,11 @@ export async function loadSceneFonts(track: TrackProject) {
 const clamp = (x: number) => Math.max(0, Math.min(1, x));
 export const BOOKLET_CONTENT = { top: 60, bottom: 940, left: 108, artworkSize: 590, lyricX: 824, lyricWidth: 960 } as const;
 const BOOKLET_FOOTER_TOP = 970;
-export const LYRIC_VIEWPORT = { top: BOOKLET_CONTENT.top, bottom: BOOKLET_FOOTER_TOP - 4 } as const;
+// Keep the lyric field optically balanced against the 1080p frame itself.
+// The top edge starts 60 px below the frame, so the bottom edge ends 60 px
+// above it as well. The footer sits outside the lyric text lane horizontally,
+// so future lyrics may continue below the footer baseline without colliding.
+export const LYRIC_VIEWPORT = { top: BOOKLET_CONTENT.top, bottom: 1080 - BOOKLET_CONTENT.top } as const;
 const contentHeight = BOOKLET_CONTENT.bottom - BOOKLET_CONTENT.top;
 // Canonical 1080p values; multiply by 2/3 for the 720p reference.
 export const METADATA_STYLE = {
