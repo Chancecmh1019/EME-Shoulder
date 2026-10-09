@@ -30,13 +30,39 @@ export const LYRIC_STYLE = {
   translationOpacity: .87, internalGap: lyricPixels(20),
   nearGap: lyricPixels(42), farGap: lyricPixels(38), anchorRatio: .435,
 } as const;
+// Optical focus uses physical distances at the 720p reference, not item indices.
 export const LYRIC_DEPTH = {
-  activeBlur: 0, nearBlur: lyricPixels(1.8), middleBlur: lyricPixels(2.8),
-  farBlur: lyricPixels(3.8), fourthBlur: lyricPixels(4.6), maxBlur: lyricPixels(5.3),
-  nearOpacity: .54, middleOpacity: .36, farOpacity: .24,
-  fourthOpacity: .18, distantOpacity: .12, minimumFutureOpacity: .10,
+  activeBlur: 0, maxBlur: lyricPixels(2.5),
+  distances: [0, 85, 160, 250, 350, 440, 520],
+  blur: [0, .65, 1.1, 1.55, 1.9, 2.25, 2.5],
+  opacityDistances: [0, 100, 180, 280, 380, 480],
+  opacity: [1, .60, .47, .35, .25, .18],
 } as const;
-const LYRIC_EDGE_FEATHER = 32;
+function interpolatePhysicalFocus(distance: number, positions: readonly number[], values: readonly number[]): number {
+  if (distance <= positions[0]) return values[0];
+  for (let i = 1; i < positions.length; i++) {
+    if (distance > positions[i]) continue;
+    const progress = clamp((distance - positions[i - 1]) / (positions[i] - positions[i - 1]));
+    const eased = progress * progress * (3 - 2 * progress);
+    return values[i - 1] + (values[i] - values[i - 1]) * eased;
+  }
+  return values[values.length - 1];
+}
+export function lyricOpticalFocus(physicalDistancePx: number) {
+  // Scene geometry is always in 1080p space; the output canvas scales both
+  // positions and blur together for preview, master, and Threads renders.
+  const distance = Math.abs(physicalDistancePx) * LYRIC_REFERENCE_HEIGHT / 1080;
+  return {
+    blur: Math.min(LYRIC_DEPTH.maxBlur, lyricPixels(interpolatePhysicalFocus(distance, LYRIC_DEPTH.distances, LYRIC_DEPTH.blur))),
+    opacity: interpolatePhysicalFocus(distance, LYRIC_DEPTH.opacityDistances, LYRIC_DEPTH.opacity),
+  };
+}
+const LYRIC_MASK_FEATHER = lyricPixels(32);
+export function lyricEdgeOpacity(y: number): number {
+  const edgeDistance = Math.min(y - LYRIC_VIEWPORT.top, LYRIC_VIEWPORT.bottom - y);
+  const progress = clamp(edgeDistance / LYRIC_MASK_FEATHER);
+  return progress * progress * (3 - 2 * progress);
+}
 export function displayAlbumTitle(album: string): string {
   const title = album.trim();
   return title ? (title.startsWith('《') && title.endsWith('》') ? title : `《${title}》`) : '';
@@ -137,7 +163,7 @@ export function activeLine(lyrics: LyricLine[], time: number): number {
   while (lo <= hi) { const mid = (lo + hi) >> 1; if (lyrics[mid].startTime <= time) { found = mid; lo = mid + 1; } else hi = mid - 1; }
   return found >= 0 && time < lyrics[found].endTime ? found : -1;
 }
-function naturalLyricState(track: TrackProject, clock: RenderClock, measured: MeasuredLine[], settledFocus?: number) {
+export function sceneState(track: TrackProject, clock: RenderClock, measured: MeasuredLine[]) {
   const time = clock.currentTimeSeconds - track.lyricOffset;
   const index = activeLine(track.lyrics, time);
   let anchorIndex = index;
@@ -147,7 +173,7 @@ function naturalLyricState(track: TrackProject, clock: RenderClock, measured: Me
   const x = current ? clamp((time - current.line.startTime) / transition) : 1;
   const ease = x * x * (3 - 2 * x);
   const previousIndex = Math.max(0, anchorIndex - 1);
-  const focus = settledFocus ?? previousIndex + (anchorIndex - previousIndex) * ease;
+  const focus = previousIndex + (anchorIndex - previousIndex) * ease;
   const interpolateDepth = (distance: number, stops: number[]) => {
     const segment = Math.min(stops.length - 2, Math.floor(distance));
     const progress = clamp(distance - segment);
@@ -182,107 +208,25 @@ function naturalLyricState(track: TrackProject, clock: RenderClock, measured: Me
     const gap = i ? desiredGaps[i - 1] : 0;
     centers[i] = i ? centers[i - 1] + heights[i - 1] / 2 + gap + heights[i] / 2 : heights[i] / 2;
   }
-  const scrollAnchor = settledFocus === undefined
-    ? mix(centers[previousIndex] ?? 0, centers[anchorIndex] ?? 0)
-    : centers[settledFocus] ?? 0;
+  const scrollAnchor = mix(centers[previousIndex] ?? 0, centers[anchorIndex] ?? 0);
   const lyricRegionTop = LYRIC_VIEWPORT.top, lyricRegionBottom = LYRIC_VIEWPORT.bottom;
-  // Preserve the approved adaptive-context eligibility before balancing.
-  // This reference anchor selects context; it is not the final placement.
+  // Extending visibility below the stream must not move its approved focus.
   const activeAnchor = BOOKLET_CONTENT.top + contentHeight * LYRIC_STYLE.anchorRatio;
+  const activeCenterY = activeAnchor + (centers[index >= 0 ? index : anchorIndex] ?? 0) - scrollAnchor;
   const lyrics = measured.map((m, i) => {
-    // Extra context occupies the same measured continuous stream, with no slots
-    // or gap stretching. Only future items beyond +3 need available bottom space.
+    // Layout decides what fits; optical focus and the pixel-position edge mask
+    // must not hide a short item merely because its logical index is farther.
     const distance = Math.abs(i - focus);
-    const upcoming = i >= focus;
     const y = activeAnchor + centers[i] - scrollAnchor;
-    let opacity = interpolateDepth(distance, upcoming
-      ? [1, LYRIC_DEPTH.nearOpacity, LYRIC_DEPTH.middleOpacity, LYRIC_DEPTH.farOpacity, LYRIC_DEPTH.fourthOpacity, LYRIC_DEPTH.distantOpacity, LYRIC_DEPTH.minimumFutureOpacity]
-      : [1, LYRIC_DEPTH.nearOpacity, LYRIC_DEPTH.middleOpacity, 0]);
-    let blur = interpolateDepth(distance, [LYRIC_DEPTH.activeBlur, LYRIC_DEPTH.nearBlur, LYRIC_DEPTH.middleBlur, LYRIC_DEPTH.farBlur, LYRIC_DEPTH.fourthBlur, LYRIC_DEPTH.maxBlur]);
-    if (upcoming && distance > 3) {
-      const top = y - heights[i] / 2;
-      const room = clamp((lyricRegionBottom + LYRIC_EDGE_FEATHER - top) / LYRIC_EDGE_FEATHER);
-      const fit = room * room * (3 - 2 * room);
-      const extra = clamp(distance - 3);
-      const blend = extra * extra * (3 - 2 * extra);
-      // Let a partial final item reach the bottom mask. Requiring its entire
-      // block to fit would hide the continuing stream above the footer boundary.
-      opacity *= 1 - blend + blend * fit;
-    }
+    const physicalDistancePx = Math.abs(y - activeCenterY);
+    const opticalFocus = lyricOpticalFocus(physicalDistancePx);
+    let blur = opticalFocus.blur;
     // The timed active item stays sharp even while its scroll focus is arriving.
     if (i === index) blur = LYRIC_DEPTH.activeBlur;
-    return { ...typography[i], index: i, y, opacity, blur, scale: scales[i], active: i === index, distance };
+    return { ...typography[i], index: i, y, opacity: opticalFocus.opacity, blur, scale: scales[i], active: i === index, distance, physicalDistancePx };
   });
-  return { time: clock.currentTimeSeconds, activeIndex: index, contentTop: BOOKLET_CONTENT.top, contentBottom: BOOKLET_CONTENT.bottom, lyricRegionTop, lyricRegionBottom, activeAnchor, lyrics, ease, previousIndex, anchorIndex };
+  return { time: clock.currentTimeSeconds, activeIndex: index, contentTop: BOOKLET_CONTENT.top, contentBottom: BOOKLET_CONTENT.bottom, lyricRegionTop, lyricRegionBottom, activeAnchor, lyrics };
 }
-
-// Cache settled geometry by measured text, never by previously rendered frames.
-const lyricBalanceCache = new WeakMap<MeasuredLine[], Map<number, number>>();
-type NaturalLyricState = ReturnType<typeof naturalLyricState>;
-function measuredStreamCorrection(state: NaturalLyricState, focus: number): number {
-  const { lyricRegionTop: top, lyricRegionBottom: bottom } = state;
-  const eligible = state.lyrics.filter(p => p.opacity > 0 && p.height > 0);
-  const participating = new Set<number>();
-  const participates = (p: NaturalLyricState['lyrics'][number], correction: number) => {
-    const halfHeight = p.height * p.scale / 2;
-    // Feather-only slivers must not enlarge the composition's bounds.
-    const overlap = Math.min(p.y + correction + halfHeight, bottom - LYRIC_EDGE_FEATHER)
-      - Math.max(p.y + correction - halfHeight, top + LYRIC_EDGE_FEATHER);
-    return overlap > Math.min(halfHeight * .3, LYRIC_EDGE_FEATHER);
-  };
-  for (const pose of eligible) {
-    if (pose.index === focus || participates(pose, 0)) participating.add(pose.index);
-  }
-  if (!participating.size) return 0;
-  const itemTop = (pose: NaturalLyricState['lyrics'][number]) => pose.y - pose.height * pose.scale / 2;
-  const itemBottom = (pose: NaturalLyricState['lyrics'][number]) => pose.y + pose.height * pose.scale / 2;
-  const initial = eligible.filter(pose => participating.has(pose.index));
-  const midpoint = (top + bottom) / 2;
-  const preferred = midpoint - (Math.min(...initial.map(itemTop)) + Math.max(...initial.map(itemBottom))) / 2;
-  const isBalanced = (correction: number) => {
-    const active = eligible.find(pose => pose.index === focus);
-    if (active && !participates(active, correction)) return false;
-    const visible = eligible.filter(pose => participates(pose, correction));
-    if (!visible.length) return false;
-    const visibleTop = Math.max(top, Math.min(...visible.map(itemTop)) + correction);
-    const visibleBottom = Math.min(bottom, Math.max(...visible.map(itemBottom)) + correction);
-    return Math.abs((visibleTop - top) - (bottom - visibleBottom)) < .01;
-  };
-  if (isBalanced(preferred)) return preferred;
-  // Recheck visibility AFTER the shared shift. An edge item may enter or leave
-  // the mask; solve from complete measured bounds of the resulting group,
-  // rather than allowing a now-hidden item's height to bias the centering.
-  let correction = preferred, nearest = Infinity;
-  for (let first = 0; first < eligible.length; first++) {
-    for (let last = first; last < eligible.length; last++) {
-      const candidate = midpoint - (itemTop(eligible[first]) + itemBottom(eligible[last])) / 2;
-      const change = Math.abs(candidate - preferred);
-      if (change < nearest && isBalanced(candidate)) { correction = candidate; nearest = change; }
-    }
-  }
-  return correction;
-}
-export function sceneState(track: TrackProject, clock: RenderClock, measured: MeasuredLine[]) {
-  const state = naturalLyricState(track, clock, measured);
-  let corrections = lyricBalanceCache.get(measured);
-  if (!corrections) { corrections = new Map(); lyricBalanceCache.set(measured, corrections); }
-  const correctionAt = (focus: number) => {
-    let correction = corrections!.get(focus);
-    if (correction === undefined) {
-      correction = measuredStreamCorrection(naturalLyricState(track, clock, measured, focus), focus);
-      corrections!.set(focus, correction);
-    }
-    return correction;
-  };
-  const from = correctionAt(state.previousIndex), to = correctionAt(state.anchorIndex);
-  // Use the existing source-time easing: seeking/exporting gives the same
-  // composition, and changing context cannot snap the entire stream.
-  const verticalCorrection = from + (to - from) * state.ease;
-  const { ease: _ease, previousIndex: _previous, anchorIndex: _anchor, ...scene } = state;
-  return { ...scene, activeAnchor: state.activeAnchor + verticalCorrection, verticalCorrection,
-    lyrics: state.lyrics.map(pose => ({ ...pose, y: pose.y + verticalCorrection })) };
-}
-
 export async function loadCover(blob?: Blob): Promise<HTMLImageElement> {
   let url: string;
   if (blob) url = URL.createObjectURL(blob);
@@ -355,13 +299,20 @@ export class BookletScene {
         layer.font = `400 ${pose.translationBlock.size}px ${FONT}`; layer.fillStyle = '#f0dfc2'; m.translation.forEach((l, i) => layer.fillText(l, 0, y - pose.translationBlock.inkTop + i * pose.translationBlock.lineHeight)); layer.restore();
       }
       layer.save(); layer.globalCompositeOperation = 'destination-in';
-      // Both edges finish the distance fade without borrowing metadata space.
+      // Mirror the same source-space opacity envelope at both fixed edges.
+      // Apply it to the composed bilingual layer, without shifting any item.
       const fade = layer.createLinearGradient(0, 0, 0, this.lyricHeight);
-      const maskTop = (state.lyricRegionTop - this.lyricTop) / this.lyricHeight;
-      const maskBottom = (state.lyricRegionBottom - this.lyricTop) / this.lyricHeight;
-      fade.addColorStop(0, 'transparent');
-      fade.addColorStop(maskTop, 'transparent'); fade.addColorStop(maskTop + LYRIC_EDGE_FEATHER / this.lyricHeight, '#fff');
-      fade.addColorStop(maskBottom - LYRIC_EDGE_FEATHER / this.lyricHeight, '#fff'); fade.addColorStop(maskBottom, 'transparent'); fade.addColorStop(1, 'transparent');
+      const maskSteps = 8;
+      for (let step = 0; step <= maskSteps; step++) {
+        const inset = LYRIC_MASK_FEATHER * step / maskSteps;
+        const alpha = lyricEdgeOpacity(state.lyricRegionTop + inset);
+        fade.addColorStop(inset / this.lyricHeight, `rgba(255,255,255,${alpha})`);
+      }
+      for (let step = maskSteps; step >= 0; step--) {
+        const inset = LYRIC_MASK_FEATHER * step / maskSteps;
+        const alpha = lyricEdgeOpacity(state.lyricRegionBottom - inset);
+        fade.addColorStop(1 - inset / this.lyricHeight, `rgba(255,255,255,${alpha})`);
+      }
       layer.fillStyle = fade; layer.fillRect(0, 0, 1060, this.lyricHeight); layer.restore(); ctx.drawImage(this.lyricCanvas, BOOKLET_CONTENT.lyricX - 39, this.lyricTop);
     } else { ctx.font = `400 40px ${FONT}`; ctx.fillText('繁體中文歌詞', 820, 875); }
     ctx.globalAlpha = .82; ctx.fillStyle = '#f6f0e5'; ctx.font = `400 ${thumbnail ? 28 : 19}px ${FONT}`; ctx.fillText('EMBRASEA  /  MUSIC ENTERTAINMENT', 108, BOOKLET_FOOTER_TOP);
