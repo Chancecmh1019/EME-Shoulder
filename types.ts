@@ -29,7 +29,7 @@ export interface VisualConfig { fps: 30 | 60; flowSpeed: number; fontScale: numb
 export interface AlbumProject { id: string; title: string; artist: string; artworkKey?: string; visual: VisualConfig; tracks: TrackProject[]; createdAt: number; updatedAt: number }
 export interface CorrectionLog { type: 'success' | 'warning' | 'error'; message: string }
 export interface LyricDraft { input: string; output: string; format: 'lrc' | 'srt'; convertChinese: boolean; offset: number; logs: CorrectionLog[] }
-export interface Library { albums: AlbumProject[]; mv: TrackProject[]; lab: LyricLine[]; labText: string; labDraft?: LyricDraft; labPromptFormat?: 'lrc' | 'srt'; renderJobs: RenderJob[]; lastAlbumId?: string; lastTrackId?: string }
+export interface Library { albums: AlbumProject[]; mv: TrackProject[]; lab: LyricLine[]; labText: string; labDraft?: LyricDraft; labPromptFormat?: 'lrc' | 'srt'; renderJobs: RenderJob[]; queuePaused?: boolean; lastAlbumId?: string; lastTrackId?: string }
 export interface RenderClock { currentTimeSeconds: number; frameIndex?: number }
 export const defaultVisual: VisualConfig = { fps: 60, flowSpeed: 0.35, fontScale: 1, vignette: 0.22 };
 export const emptyLibrary = (): Library => ({ albums: [], mv: [], lab: [], labText: '', renderJobs: [] });

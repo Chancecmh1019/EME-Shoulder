@@ -13,7 +13,26 @@ export async function api<T = any>(url: string, body?: unknown): Promise<T> {
 export async function publishTrack(t: TrackProject, video: Blob, thumbnail: Blob | undefined, update: (patch: Partial<TrackProject>) => Promise<void>, signal: AbortSignal) {
   const issues = validatePublishing(t); if (issues.length) throw new Error(issues.join('；'));
   let youtubeId = t.youtubeId, url = t.uploadUrl, offset = 0;
-  const token = async () => (await api('/api/auth?action=token', {})).accessToken;
+  let cachedToken: string | undefined, tokenUntil = 0;
+  const token = async () => {
+    checkAbort(signal);
+    if (!cachedToken || Date.now() >= tokenUntil) {
+      cachedToken = (await api('/api/auth?action=token', {})).accessToken;
+      tokenUntil = Date.now() + 5 * 60000;
+    }
+    checkAbort(signal); return cachedToken!;
+  };
+  const authorizedFetch = async (target: string, options: RequestInit) => {
+    const send = async () => {
+      const headers = new Headers(options.headers); headers.set('Authorization', `Bearer ${await token()}`);
+      return fetch(target, { ...options, headers, signal });
+    };
+    let response = await send();
+    // A token can expire earlier than the local cache window. Refresh once,
+    // preserving the same resumable session and byte range.
+    if (response.status === 401) { cachedToken = undefined; response = await send(); }
+    return response;
+  };
   const recover = async () => {
     const status = await api('/api/youtube?action=status', { url, size: video.size });
     if (status.expired) { url = undefined; offset = 0; await update({ uploadUrl: undefined, uploadedBytes: 0 }); }
@@ -25,7 +44,7 @@ export async function publishTrack(t: TrackProject, video: Blob, thumbnail: Blob
   while (!youtubeId && offset < video.size) {
     checkAbort(signal); const end = Math.min(offset + 8 * 1024 * 1024, video.size);
     try {
-      const r = await fetch(url!, { method: 'PUT', headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'video/mp4', 'Content-Range': `bytes ${offset}-${end - 1}/${video.size}` }, body: video.slice(offset, end), signal });
+      const r = await authorizedFetch(url!, { method: 'PUT', headers: { 'Content-Type': 'video/mp4', 'Content-Range': `bytes ${offset}-${end - 1}/${video.size}` }, body: video.slice(offset, end) });
       if (r.status === 308) { const range = r.headers.get('Range'); if (range) offset = Number(range.match(/-(\d+)$/)?.[1] ?? -1) + 1; else await recover(); }
       else if (r.ok) { const data = await r.json(); if (!data.id) throw new Error('YouTube did not return a video ID'); youtubeId = data.id; offset = video.size; await update({ youtubeId, uploadUrl: undefined }); }
       else throw new Error(`YouTube upload failed (${r.status})`);
@@ -40,7 +59,7 @@ export async function publishTrack(t: TrackProject, video: Blob, thumbnail: Blob
   if (!youtubeId) throw new Error('Upload finished without a confirmed video ID. 請重試恢復。');
   await update({ youtubeId, uploadProgress: 98 }); checkAbort(signal);
   if (thumbnail) {
-    const r = await fetch(`https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=${encodeURIComponent(youtubeId)}`, { method: 'POST', headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'image/jpeg' }, body: thumbnail, signal });
+    const r = await authorizedFetch(`https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=${encodeURIComponent(youtubeId)}`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: thumbnail });
     if (!r.ok) throw new Error(`影片已上傳，縮圖設定失敗 (${r.status})。重試只會設定縮圖。`);
   }
   await update({ publish: 'completed', uploadProgress: 100, uploadUrl: undefined, error: undefined, errorStage: undefined });

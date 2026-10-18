@@ -8,8 +8,9 @@ export class ProductionQueue {
   private rendering?: string; private publishing?: string;
   private controllers = new Map<string, AbortController>(); private stopped = false;
   private unsubscribe: () => void;
-  constructor(private store: LibraryStore) { this.unsubscribe = store.subscribe(() => this.pump()); this.pump(); }
-  dispose() { this.stopped = true; this.unsubscribe(); this.controllers.forEach(c => c.abort()); }
+  constructor(private store: LibraryStore) { this.unsubscribe = store.subscribe(() => this.pump()); document.addEventListener('visibilitychange', this.onVisibility); this.pump(); }
+  dispose() { this.stopped = true; this.unsubscribe(); document.removeEventListener('visibilitychange', this.onVisibility); this.controllers.forEach(c => c.abort()); }
+  private onVisibility = () => { if (document.visibilityState === 'visible') this.pump(); };
   private album(t: TrackProject) { const a = this.store.data.albums.find(a => a.tracks.some(x => x.id === t.id)); return { id: a?.id ?? t.id, visual: structuredClone(a?.visual ?? defaultVisual), artworkKey: a?.artworkKey ?? t.artworkKey }; }
   private snapshot(t: TrackProject) { const copy = structuredClone(t); delete copy.threads; return copy; }
   private patchJob(id: string, patch: Partial<RenderJob>) {
@@ -21,10 +22,11 @@ export class ProductionQueue {
     });
   }
   private pump() {
-    if (this.stopped || !this.store.ready) return;
+    if (this.stopped || !this.store.ready || this.store.data.queuePaused || document.visibilityState !== 'visible') return;
     if (!this.rendering) { const job = this.store.data.renderJobs.filter(j => j.state === 'pending').sort((a,b) => a.enqueuedAt - b.enqueuedAt)[0]; if (job) { this.rendering = job.id; void this.render(job); } }
     if (!this.publishing) { const t = [...this.store.data.albums.flatMap(a => a.tracks), ...this.store.data.mv].filter(t => t.render === 'completed' && t.publish === 'pending').sort((a,b) => (a.approvedAt ?? 0) - (b.approvedAt ?? 0))[0]; if (t) { this.publishing = t.id; void this.publish(t); } }
   }
+  async resume() { await this.store.change(data => { data.queuePaused = false; }); }
   async approve(t: TrackProject, autoUpload = true) {
     if (this.store.data.renderJobs.some(j => j.trackId === t.id && j.kind !== 'THREADS_CLIP' && ['pending','running'].includes(j.state))) throw new Error('此曲目已在渲染佇列。');
     const flags = { autoUpload, review: 'approved' as const, approvedAt: Date.now(), render: 'pending' as const, publish: 'idle' as const, error: undefined, errorStage: undefined, renderProgress: 0, uploadProgress: 0, uploadUrl: undefined, youtubeId: undefined };
@@ -60,7 +62,15 @@ export class ProductionQueue {
       checkAbort(controller.signal); await this.patchJob(job.id, { state: 'running' });
       const { renderTrack, makeThumbnail } = await import('./renderEngine');
       if (job.kind === 'ALBUM_MASTER') { const thumbnail = await makeThumbnail(t, album); checkAbort(controller.signal); await putMedia(`${t.id}/thumbnail`, thumbnail); await this.store.patchTrack(t.id, { thumbnailKey: `${t.id}/thumbnail` }); }
-      outputKey = await renderTrack(t, album, p => { void this.patchJob(job.id, { progress: p }).catch(() => controller.abort()); }, controller.signal, job.range);
+      let lastProgressUpdate = -Infinity;
+      outputKey = await renderTrack(t, album, p => {
+        const now = performance.now();
+        // Progress writes clone/persist the library. Cap UI work without
+        // changing frame generation, encoding, or the final completion write.
+        if (p < 100 && now - lastProgressUpdate < 250) return;
+        lastProgressUpdate = now;
+        void this.patchJob(job.id, { progress: p }).catch(() => controller.abort());
+      }, controller.signal, job.range);
       checkAbort(controller.signal);
       const oldKey = job.kind === 'THREADS_CLIP' ? this.store.track(t.id)?.threads?.outputKey : this.store.track(t.id)?.outputKey;
       await this.store.change(data => {

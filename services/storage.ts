@@ -23,16 +23,19 @@ export async function loadLibrary(): Promise<Library> {
   library.renderJobs ??= [];
   for (const album of library.albums) album.visual.fps = 60;
   for (const t of [...library.albums.flatMap(a => a.tracks), ...library.mv]) {
-    if (t.render === 'running') { t.render = 'error'; t.error = '渲染已中斷。請重試。'; t.errorStage = 'render'; }
-    if (t.publish === 'running') { t.publish = 'error'; t.error = '上傳已中斷。可從已保存的 MP4 重試。'; t.errorStage = 'publish'; }
+    if (t.render === 'running') { t.render = 'pending'; t.renderProgress = 0; t.error = undefined; t.errorStage = undefined; }
+    if (t.publish === 'running') { t.publish = 'pending'; t.error = undefined; t.errorStage = undefined; }
     if (t.threads?.analysis === 'running') { t.threads.analysis = 'cancelled'; t.threads.error = '分析已中斷，可重新尋找片段。'; }
-    if (t.threads?.render === 'running') { t.threads.render = 'error'; t.threads.error = '片段渲染已中斷，請在 Queue 重試。'; }
+    if (t.threads?.render === 'running') { t.threads.render = 'pending'; t.threads.renderProgress = 0; t.threads.error = undefined; }
     if (t.render !== 'idle' && !library.renderJobs.some(j => j.trackId === t.id && j.kind !== 'THREADS_CLIP')) {
       const album = library.albums.find(a => a.tracks.some(x => x.id === t.id));
       library.renderJobs.push({ id: crypto.randomUUID(), trackId: t.id, kind: t.kind === 'mv' ? 'MV_MASTER' : 'ALBUM_MASTER', enqueuedAt: t.approvedAt ?? 0, state: t.render, progress: t.renderProgress, snapshot: t.render === 'completed' ? undefined : structuredClone(t), album: { id: album?.id ?? t.id, artworkKey: album?.artworkKey ?? t.artworkKey, visual: album?.visual ?? defaultVisual }, outputKey: t.outputKey, error: t.errorStage === 'render' ? t.error : undefined });
     }
   }
-  for (const job of library.renderJobs) if (job.state === 'running') { job.state = 'error'; job.error = '渲染已中斷，請重試。'; }
+  for (const job of library.renderJobs) if (job.state === 'running') { job.state = 'pending'; job.progress = 0; job.error = undefined; }
+  // Never skip an interrupted job and immediately start its successors.
+  // Keep original FIFO timestamps and resumable-upload URLs intact.
+  if (library.renderJobs.some(j => j.state === 'pending') || [...library.albums.flatMap(a => a.tracks), ...library.mv].some(t => t.publish === 'pending')) library.queuePaused = true;
   return library;
 }
 export function download(blob: Blob, name: string) {
