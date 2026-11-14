@@ -9,6 +9,8 @@ export function parseLRC(text: string, duration = 0): LyricLine[] {
   const groups = new Map<number, string[]>();
   const offset = Number(text.match(/^\[offset:([+-]?\d+)\]/mi)?.[1] ?? 0) / 1000;
   for (const raw of text.replace(/^\uFEFF/, '').replace(/\r/g, '').split('\n')) {
+    // Zero sentinel is file structure, never a displayed lyric (even with offset).
+    if (/^\s*\[00:00[.,]000\]\s*$/.test(raw)) continue;
     const matches = [...raw.matchAll(/\[(\d+):([0-5]\d)(?:[.,](\d{1,3}))?\]/g)];
     if (!matches.length) continue;
     let pending: number[] = [];
@@ -41,7 +43,7 @@ export function formatTime(t: number, srt = false): string {
   return `${pad(Math.floor(seconds / 60))}:${pad(seconds % 60)}.${pad(ms % 1000, 3)}`;
 }
 export function serializeLRC(lines: LyricLine[], offset = 0): string {
-  return lines.flatMap(l => [l.original, ...l.translation.split('\n').filter(Boolean)].map(text => `[${formatTime(l.startTime + offset)}]${text}`)).join('\n');
+  return ['[00:00.000]', ...lines.filter(l => !(l.startTime === 0 && !l.original.trim() && !l.translation.trim())).flatMap(l => [l.original, ...l.translation.split('\n').filter(Boolean)].map(text => `[${formatTime(l.startTime + offset)}]${text}`))].join('\n');
 }
 export function serializeSRT(lines: LyricLine[], offset = 0): string {
   return lines.map((l, i) => `${i + 1}\n${formatTime(l.startTime + offset, true)} --> ${formatTime(l.endTime + offset, true)}\n${[l.original, l.translation].filter(Boolean).join('\n')}`).join('\n\n');

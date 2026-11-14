@@ -10,6 +10,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "check": "tsc --noEmit",
+    "test": "node --loader ./scripts/typescript-loader.mjs --test tests/*.test.ts",
     "assets": "node scripts/assets.mjs",
     "postinstall": "npm run assets"
   },
