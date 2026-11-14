@@ -39,3 +39,9 @@ Desktop.ini
 *.njsproj
 *.sln
 *.sw?
+
+# Read-only owner-supplied research and local Studio data
+/*.zip
+/reference/
+/research/
+/.studio/
