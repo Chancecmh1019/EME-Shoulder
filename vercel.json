@@ -1,6 +1,5 @@
 {
-  "git": { "deploymentEnabled": false },
-  "git": { "deploymentEnabled": false },
+  "git": { "deploymentEnabled": true },
   "buildCommand": "npm run build", "outputDirectory": "dist", "framework": "vite",
   "rewrites": [{ "source": "/((?!api/|ffmpeg/|assets/|licenses/|.*\\.[^/]+$).*)", "destination": "/index.html" }],
   "headers": [{ "source": "/(.*)", "headers": [
