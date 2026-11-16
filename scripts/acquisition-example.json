@@ -1,0 +1,13 @@
+{
+  "identity": { "title": "Code Monkey", "artist": "Jonathan Coulton", "album": "Thing a Week Three" },
+  "language": "en",
+  "audio": {
+    "url": "https://archive.org/download/jonathan-coulton-code-monkey/Jonathan%20Coulton%20-%20Code%20Monkey.mp3",
+    "allowedRedirectHosts": ["dn721300.ca.archive.org"],
+    "permission": {
+      "basis": "Author CC BY-NC permission for the original recording, redistributed studio recording identified as Thing A Week Three; local noncommercial verification only; no YouTube upload",
+      "reference": "https://www.jonathancoulton.com/faq/",
+      "archiveMetadata": "https://archive.org/metadata/jonathan-coulton-code-monkey"
+    }
+  }
+}

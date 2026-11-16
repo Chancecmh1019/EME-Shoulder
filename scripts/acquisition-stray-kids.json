@@ -1,0 +1,18 @@
+{
+  "identity": {
+    "title": "November 11th",
+    "artist": "Stray Kids",
+    "artistAliases": ["Stray Kids (스트레이 키즈)"],
+    "album": "November 11th",
+    "aliases": ["11월 11일", "11월 11일 (November 11th)"],
+    "albumAliases": ["11월 11일", "11월 11일 (November 11th)", "November 11th - Single"],
+    "durationMs": 186000
+  },
+  "language": "ko",
+  "references": [
+    "https://music.youtube.com/watch?v=5mESl85XgyI",
+    "https://music.apple.com/us/album/november-11th-single/6804531602",
+    "https://www.sonymusic.co.jp/artist/StrayKids/info/586717"
+  ],
+  "audio": null
+}

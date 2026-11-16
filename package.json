@@ -4,17 +4,23 @@
   "version": "1.0.0",
   "license": "AGPL-3.0-only",
   "type": "module",
-  "engines": { "node": "22.x" },
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "check": "tsc --noEmit",
+    "test": "node --loader ./scripts/typescript-loader.mjs --test tests/*.test.ts",
+    "acquire": "node --loader ./scripts/typescript-loader.mjs scripts/acquire.ts",
     "assets": "node scripts/assets.mjs",
     "postinstall": "npm run assets"
   },
   "dependencies": {
     "@applemusic-like-lyrics/core": "0.6.0",
+    "@aws-sdk/client-s3": "^3.1169.0",
+    "@aws-sdk/s3-request-presigner": "^3.1169.0",
     "@ffmpeg/core": "0.12.10",
     "@ffmpeg/ffmpeg": "0.12.15",
     "@ffmpeg/util": "0.12.2",
@@ -28,11 +34,14 @@
     "mediabunny": "1.61.0",
     "music-metadata": "11.7.3",
     "opencc-js": "1.0.5",
+    "pg": "^8.23.1",
     "react": "^19.2.1",
     "react-dom": "^19.2.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.16",
     "@types/node": "^22.14.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.0",

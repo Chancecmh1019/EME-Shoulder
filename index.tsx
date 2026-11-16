@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
+const App = location.pathname === '/studio-render' ? lazy(() => import('./components/StudioRender')) : location.pathname === '/dot-guide' ? lazy(() => import('./components/DotGuide')) : location.pathname === '/dot' ? lazy(() => import('./components/LocalDotControl')) : location.pathname === '/dot-cloud' ? lazy(() => import('./components/DotControl')) : location.pathname === '/studio-access' ? lazy(() => import('./components/StudioAccess')) : location.pathname === '/studio-verify' ? lazy(() => import('./components/PairReview')) : location.pathname === '/render-probe' ? lazy(() => import('./components/RenderProbe')) : lazy(() => import('./App'));
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -10,6 +10,6 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <Suspense fallback={<p role="status">正在開啟製作工作區…</p>}><App /></Suspense>
   </React.StrictMode>
 );

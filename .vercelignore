@@ -1,0 +1,12 @@
+.git
+.studio
+.env*
+*.zip
+reference
+research
+renders
+exports
+test-results
+playwright-report
+EME_Studio_2_Codex_Master_Prompt.md
+EME_Dot_Engineering_Blueprint.md

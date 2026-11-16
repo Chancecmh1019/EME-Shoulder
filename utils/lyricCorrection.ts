@@ -25,6 +25,7 @@ export function correctLyrics(draft: LyricDraft): LyricDraft {
   const stamp = /\[(\d{1,3})[.:,]([0-5]?\d)(?:[.:,](\d{1,3}))?\]/g;
   for (const [lineIndex, line] of raw.split('\n').entries()) {
     if (!line.trim()) continue;
+    if (/^\s*\[00:00[.,]000\]\s*$/.test(line)) continue;
     if (/^\s*\[(ar|ti|al|by|offset|re|ve|length):.*\]\s*$/i.test(line)) { metadata.push(line.trim()); continue; }
     const matches = [...line.matchAll(stamp)];
     if (!matches.length) { logs.push({ type: 'error', message: `第 ${lineIndex + 1} 行沒有可校正的時間戳記；內容未刪除，請修正輸入。` }); continue; }
@@ -57,5 +58,5 @@ export function correctLyrics(draft: LyricDraft): LyricDraft {
   if (converted) logs.push({ type: 'success', message: `已將 ${converted} 行中文轉為繁體中文。` });
   if (trimmed) logs.push({ type: 'success', message: `已清理 ${trimmed} 處尾部空白。` });
   logs.unshift({ type: 'success', message: `校正完成：${groups.size} 個時間點，已排序並保留原文／翻譯。` });
-  return { ...draft, output: [...metadata, ...records.map(r => `[${formatTime(r.time)}]${r.text}`)].join('\n'), logs };
+  return { ...draft, output: ['[00:00.000]', ...metadata, ...records.map(r => `[${formatTime(r.time)}]${r.text}`)].join('\n'), logs };
 }
