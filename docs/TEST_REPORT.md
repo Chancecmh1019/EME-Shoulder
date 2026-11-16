@@ -1,5 +1,17 @@
 # 實測報告・2026-11-14
 
+## 2026-11-16 最新進度（以下舊報告保留為歷史）
+
+完整系統仍為 **No-Go**。已實際用獨立 Mornye-Python 2.0.6、官方 utilities／TIDAL 插件及正常驗證工作階段，下載 Stray Kids — November 11th：25,063,494 bytes，SHA-256 `e92e8a9d0be2fdcef5b60eada9bdc7cd874a52c99e9178c93eeef2a30e34d333`。FFmpeg 全長解碼成功，186 秒、44.1 kHz、stereo、16-bit FLAC-in-MP4。重啟後驗雜湊重用，不重新下載。QQ 真實回應取得 67 行原文，去除四行標題／製作名單。
+
+依擁有者最新最低驗收政策，medium 全曲加一次結尾短段恢復，首句、末句辨識文字相符；全曲 offset -360 ms 後首末殘差 -73／+68 ms，原始 LRC 未覆寫。中間 38 行保留辨識不確定警示，不宣稱全曲完美對時。原始提示詞完整保留，promptHash `0a8755caa6aca7303531807f3d8a8742597e729a759ac52e4267eacb696404d7`。
+
+實際 PCM 衍生 WAV 32,810,478 bytes，原始與衍生音訊解碼 PCM SHA 完全一致。本機瀏覽器實際載入歌曲交接套件與 WAV，雜湊相符、duration=186；重新載入後可接續，沒有要求 DB／S3。證據在 ignored `.studio/acquisition/jobs/e060cefc00b424696ae8/` 與 `.studio/evidence/dot-local-real-audio.jpg`，不提交歌曲或秘密。
+
+已完成的既有檢查曾通過 29 tests、TypeScript 與隔離 build；後續新增的 YouTube transport／清理測試屬合成協定測試，不能當真實上傳。依擁有者最後指示不再重跑檢查。新預設為 Dot 電腦暫存模式；PostgreSQL/S3 為選用。原網站 correctLyrics 已接到翻譯提交，原文／時間維持不變。尚未驗收：真正 Dot 雲端執行、完整歌曲翻譯／全長影片與縮圖、Google OAuth／Private upload、小專輯及完整清理 E2E。沒有真實 YouTube upload、main merge 或正式部署。
+
+供應商錯誤：YouTube 插件 Cobalt 404、yt1d 400；Qobuz store 403。TIDAL 正常工作階段完成後取得完整音檔。YouTube Music 搜尋／專輯辨識已實測；它的原生下載功能存在，但本機上述備援未成功，不能宣稱手機及所有環境相同。
+
 ## 範圍與結論
 
 工作目錄 `D:/Projects Studio/EME Shoulder`，branch `feat/eme-studio-2`，baseline `9f34162`。僅修改 EME application；四份 upstream ZIP 直接唯讀檢視，未解壓或匯入。正式站／main／遠端服務未修改。

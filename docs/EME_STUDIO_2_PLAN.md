@@ -1,5 +1,7 @@
 # EME Studio 2.0 實作計畫
 
+> 2026-11-16 最新擁有者決策優先：EME 協調、Dot 電腦執行及暫存、專用工具原生運行；Private 上傳處理成功後清理本次素材。PostgreSQL／S3 改為選用模式，不是預設前提。最低校對為錄音身分、完整音檔與首末句對應，可有紀錄地全曲加減毫秒；不要求完美全曲 ASR。以下早期雲端持久化計畫為歷史，不得用來覆蓋此決策。
+
 ## 起點與來源
 
 2026-11-14，`D:/Projects Studio/EME Shoulder`，remote `Chancecmh1019/EME-Shoulder`，起點 `9f34162`。原始 tracked working tree 無修改；兩份需求文件、handoff ZIP 與四份參考 ZIP 原本未追蹤。已完整閱讀 Master Prompt 與 Engineering Blueprint，執行順序採 Master 的 Phase 0–6（Blueprint 的階段粒度不同）。`DEPLOYMENT.md` 明列 production branch 為 main；未查詢或變更遠端 Vercel。

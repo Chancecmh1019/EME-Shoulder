@@ -17,7 +17,13 @@ function submission(repo: StudioRepository, track: string) {
   const p = repo.package('owner', track);
   return { sourceRevision: p.sourceRevision, sourceHash: p.sourceHash, promptHash: p.promptHash, lines: p.lines.map((l, i) => ({ ...l, translation: i ? '我寫下這首歌' : '海潮，再次歸來' })) };
 }
-function fixture() { const repo = new StudioRepository(':memory:'); const job = repo.create('owner', 'create-key-001', input); const track = String(job.tracks[0].id); return { repo, job, track }; }
+// Explicit injected gate records for legacy regression fixtures only. Not real audio verification.
+function seedFixturePair(repo: StudioRepository, track: string) {
+  const source = repo.db.prepare('SELECT s.* FROM sources s JOIN tracks t ON t.id=s.track_id AND t.revision=s.revision WHERE t.id=?').get(track) as any;
+  repo.db.prepare("INSERT OR REPLACE INTO pair_inputs VALUES(?,?,?,?,'TRANSLATION_READY')").run(track,'test-fixture-audio','fixture-hash','{}');
+  repo.db.prepare("INSERT INTO pair_reports(track_id,revision,source_hash,audio_id,audio_hash,status,evidence,report,created_at) VALUES(?,?,?,?,?,'PAIR_VERIFIED','TEST_DOUBLE','{}',?)").run(track,source.revision,source.source_hash,'test-fixture-audio','fixture-hash',Date.now());
+}
+function fixture() { const repo = new StudioRepository(':memory:'); const job = repo.create('owner', 'create-key-001', input); const track = String(job.tracks[0].id); seedFixturePair(repo, track); return { repo, job, track }; }
 
 test('prompt file is byte-for-byte unchanged from baseline; package exposes exact current literal', () => {
   const original = execFileSync('git', ['show', '9f34162:utils/translationPrompts.ts']);
@@ -70,10 +76,11 @@ test('stale source or prompt returns conflict; no partial writes', () => {
   try {
     const old = submission(repo, track);
     repo.replaceSource('owner', track, 1, '[00:05.000]A changed line');
+    assert.throws(() => repo.package('owner',track), { code:'PAIR_UNVERIFIED' });
     assert.throws(() => repo.submit('owner', track, 'translation-old', old), /歌詞或提示詞已更新/);
-    const body = submission(repo, track); body.promptHash = 'stale';
+    seedFixturePair(repo, track); const body = submission(repo, track); body.promptHash = 'stale';
     assert.throws(() => repo.submit('owner', track, 'translation-new', body), /歌詞或提示詞已更新/);
-    assert.equal(repo.job('owner', job.id).tracks[0].state, 'TRANSLATE');
+    assert.equal(repo.job('owner', job.id).tracks[0].state, 'TRANSLATION_READY');
     assert.equal(repo.db.prepare('SELECT count(*) n FROM translations').get()?.n, 0);
     assert.throws(() => repo.db.prepare("UPDATE sources SET raw='overwrite'").run(), /immutable/);
     assert.throws(() => repo.db.prepare("DELETE FROM events").run(), /immutable/);
@@ -94,7 +101,7 @@ test('restart preserves work; ownership prevents cross-owner access', () => {
   let repo = new StudioRepository(path);
   try {
     const job = repo.create('owner', 'create-key-001', input), track = String(job.tracks[0].id);
-    const body = submission(repo, track); repo.submit('owner', track, 'translation-001', body); repo.close(); repo = new StudioRepository(path);
+    seedFixturePair(repo, track); const body = submission(repo, track); repo.submit('owner', track, 'translation-001', body); repo.close(); repo = new StudioRepository(path);
     assert.equal(repo.job('owner', job.id).tracks[0].state, 'ALIGN');
     assert.match(repo.result('owner', track).bilingualLrc, /The sea returns/);
     assert.throws(() => repo.result('intruder', track), /NOT_FOUND/);
@@ -109,7 +116,7 @@ test('album tracks advance independently; cancelled track cannot submit', () => 
   const repo = new StudioRepository(':memory:');
   try {
     const j = repo.create('owner', 'album-key-001', { ...input, tracks: [input.tracks[0], { title: 'Second', sourceLrc: '[00:05.000]A second song' }] });
-    const a = String(j.tracks[0].id), b = String(j.tracks[1].id), old = submission(repo, a);
+    const a = String(j.tracks[0].id), b = String(j.tracks[1].id); seedFixturePair(repo,a); seedFixturePair(repo,b); const old = submission(repo,a);
     repo.cancel('owner', a); repo.submit('owner', b, 'translation-002', submission(repo, b));
     assert.throws(() => repo.submit('owner', a, 'translation-001', old), /TRACK_CANCELLED/);
     assert.deepEqual(repo.job('owner', j.id).tracks.map(t => t.state), ['CANCELLED', 'ALIGN']);
@@ -119,7 +126,7 @@ test('atomic lease fencing, heartbeat, expiry and bounded retries', () => {
   let now = 100000; const repo = new StudioRepository(':memory:', () => now);
   try {
     const j = repo.create('owner', 'lease-key-001', input), track = String(j.tracks[0].id);
-    const lease = repo.claim('owner', track, 'worker-a');
+    seedFixturePair(repo, track); const lease = repo.claim('owner', track, 'worker-a');
     assert.throws(() => repo.submit('owner', track, 'translation-001', submission(repo, track)), /LEASE_CONFLICT/);
     assert.throws(() => repo.claim('owner', track, 'worker-b'), /LEASE_BUSY/);
     assert.throws(() => repo.heartbeat('owner', track, 'wrong'), /LEASE_EXPIRED/);
@@ -133,7 +140,7 @@ test('lease replacement fences old worker; accepted worker may replay receipt af
   let now = 100000; const repo = new StudioRepository(':memory:', () => now);
   try {
     const j = repo.create('owner', 'lease-key-002', input), track = String(j.tracks[0].id);
-    const first = repo.claim('owner', track, 'worker-a'); now += 130000;
+    seedFixturePair(repo, track); const first = repo.claim('owner', track, 'worker-a'); now += 130000;
     const second = repo.claim('owner', track, 'worker-b');
     assert.throws(() => repo.submit('owner', track, 'translation-001', { ...submission(repo, track), leaseToken: first.token }), /LEASE_CONFLICT/);
     const body = { ...submission(repo, track), leaseToken: second.token };
@@ -145,7 +152,7 @@ test('a real server prompt change invalidates a previously read package', () => 
   let prompt = 'original exact prompt\r\n';
   const repo = new StudioRepository(':memory:', () => Date.now(), () => prompt);
   try {
-    const j = repo.create('owner', 'prompt-key-001', input), track = String(j.tracks[0].id), old = submission(repo, track);
+    const j = repo.create('owner', 'prompt-key-001', input), track = String(j.tracks[0].id); seedFixturePair(repo,track); const old = submission(repo,track);
     prompt += 'changed';
     assert.throws(() => repo.submit('owner', track, 'translation-001', old), { code: 'REVISION_CONFLICT' });
     assert.equal(repo.package('owner', track).exactLrcPrompt, prompt);
@@ -184,4 +191,13 @@ test('HTTP rejects unauthenticated, CSRF, wrong owner, oversized payload, arbitr
 test('durable rate limit persists and resets by window', () => {
   let now = 100000; const repo = new StudioRepository(':memory:', () => now);
   try { for (let i = 0; i < 60; i++) repo.rateLimit('owner'); assert.throws(() => repo.rateLimit('owner'), /RATE_LIMIT/); now += 60000; assert.doesNotThrow(() => repo.rateLimit('owner')); } finally { repo.close(); }
+});
+
+test('no imported LRC alone can expose translation package or accept translation', () => {
+ const repo = new StudioRepository(':memory:');
+ try { const job = repo.create('owner','unverified-001',input), id=String(job.tracks[0].id);
+ assert.equal(job.tracks[0].state,'AUDIO_PENDING');
+ assert.throws(()=>repo.package('owner',id),{code:'PAIR_UNVERIFIED'});
+ assert.throws(()=>repo.submit('owner',id,'unverified-submit',{sourceRevision:1,sourceHash:'x',promptHash:'x',lines:[]}),{code:'PAIR_UNVERIFIED'});
+ } finally {repo.close();}
 });

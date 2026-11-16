@@ -1,5 +1,7 @@
 # Dot 操作指南（本機垂直切片）
 
+> 最新預設已改為 `/dot` 電腦暫存模式，無 Supabase／S3 前提；舊授權資料庫流程在 `/dot-cloud`。以網站 `/dot-guide` 的完整當次指令及 OWNER_FIRST_TIME_SETUP.md 頂部最新步驟為準。翻譯直接使用原提示詞要求的完整雙語 LRC，網站自動轉成交接格式並執行既有繁體／格式校正。以下原雲端切片操作僅供選用，尚未完成真 Dot → Private 全流程驗收。
+
 目前是**本機驗證版**，尚未由真正 Dot 雲端電腦操作。localhost 不會自動讓遠端 Dot 存取；需先完成 staging PostgreSQL/S3 與安全授權，再由擁有者核准 preview 部署。不存在 EME 呼叫 Dot 的 API。
 
 擁有者先在本機 `.env.local` 設定 server-only OAuth/session 與 `EME_STUDIO_LOCAL_DB`（指向 `.studio` 下新檔）。不要在聊天交付憑證。Node 目標 22.x，SQLite 需要 22.13+。啟動 `npm run dev`，由擁有者在設定頁登入；正式登入未在本次測試中執行。

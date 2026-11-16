@@ -1,6 +1,7 @@
 import { accessToken, headers, mutation, uploadUrl } from './_security.js';
 export default async function handler(req: any, res: any) {
   headers(res);
+  if (process.env.EME_DEPLOYMENT === 'staging' || process.env.VERCEL_ENV === 'preview') return res.status(403).json({ code: 'UPLOAD_DISABLED_IN_STAGING', error: '尚未核准 Staging YouTube 上傳。' });
   try {
     mutation(req); const token = await accessToken(req, res); const authorization = { Authorization: `Bearer ${token}` };
     if (req.query.action === 'session') {

@@ -27,7 +27,7 @@ export function normalizeSource(text: string): { lines: SourceLine[]; removed: R
       throw new StudioError('EMPTY_SOURCE_LINE');
     }
     // Only exact role labels before the first sung line, with an explicit colon.
-    if (preface && /^(?:作詞|作词|填詞|填词|作曲|編曲|编曲|製作人|制作人|演唱|歌手|混音|錄音|录音|母帶|母带|lyricist|composer|arranger|producer|performer|engineer)\s*[:：]\s*\S.{0,100}$/iu.test(original)) {
+    if (preface && /^(?:詞|词|曲|作詞|作词|填詞|填词|作曲|編曲|编曲|製作人|制作人|演唱|歌手|混音|錄音|录音|母帶|母带|lyricist|composer|arranger|producer|performer|engineer)\s*[:：]\s*\S.{0,100}$/iu.test(original)) {
       removed.push({ row: i + 1, text: row, reason: 'prefatory-credit' }); continue;
     }
     preface = false;
