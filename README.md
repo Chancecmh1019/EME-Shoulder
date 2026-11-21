@@ -1,7 +1,5 @@
 # EME Shoulder
 
-Studio 2.0 development is isolated on `feat/eme-studio-2`. The local `/dot` translation handoff and `/render-probe` capability test are partial development features, not a completed cloud pipeline. See [implementation plan](docs/EME_STUDIO_2_PLAN.md), [test evidence](docs/TEST_REPORT.md), [Dot operating guide](docs/DOT_OPERATING_GUIDE.md), and [staging prerequisites](docs/DEPLOYMENT_STAGING.md). `npm test` runs the local domain/repository/security fixtures. Production deployment and merging require explicit owner approval.
-
 The browser-based production workspace behind EMBRASEA Music Entertainment's Traditional Chinese translated lyric-video workflow.
 
 EME Shoulder brings translation preparation, album review, CD-Booklet lyric videos, MV subtitles, publishing assets, and YouTube delivery into one workspace. It also produces promotional excerpts for manual publication on Threads. Media processing takes place in the browser; a small server layer handles Google authorization and YouTube upload coordination.

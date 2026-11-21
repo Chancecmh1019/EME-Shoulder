@@ -2,7 +2,6 @@ import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 import { config, seal, unseal, cookie, setCookie, headers, mutation, session, accessToken, verifyIdentity } from './_security.js';
 export default async function handler(req: any, res: any) {
   headers(res);
-  if (process.env.EME_DEPLOYMENT === 'staging' || process.env.VERCEL_ENV === 'preview') return res.status(403).json({ code: 'GOOGLE_DISABLED_IN_STAGING', error: 'Staging 不提供舊版 Google token 或 YouTube 授權。' });
   let callbackOrigin: string | undefined;
   try {
     const action = req.query.action; const c = config(); const redirect = `${c.origin}/api/auth?action=callback`;

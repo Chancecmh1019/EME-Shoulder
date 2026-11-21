@@ -1,7 +1,5 @@
 # Licensing and source availability
 
-Studio 2.0 source audit (2026-11-14): the owner-supplied Lyrico, Lyrico-Plugins, Mornye and Mornye-Extension ZIPs were inspected read-only as behavioral references. No upstream plugin or host source is copied, linked or vendored into this implementation. Mornye and its extension archive identify LGPL-3.0-only; the Lyrico host identifies Apache-2.0. No root LICENSE was found in the supplied Lyrico-Plugins archive; copying its implementation remains prohibited pending a license review. The local render probe uses programmatically generated test text and a synthetic 440 Hz signal, not downloaded music. No new dependency was added.
-
 EME Shoulder is distributed under AGPL-3.0-only. The complete license is in LICENSE.
 The upstream repository did not contain a license in this supplied checkout; publication under this license must be made by the repository copyright holder.
 
